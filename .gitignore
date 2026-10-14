@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+/.start-local.lock/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
