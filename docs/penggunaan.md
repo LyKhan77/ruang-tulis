@@ -98,12 +98,35 @@ Gunakan **Ctrl** pada Windows/Linux dan **⌘** pada macOS. Pintasan format/riwa
 
 Daftar ini mencakup pintasan aplikasi dan pintasan pemformatan yang ditampilkan toolbar; bukan daftar seluruh keymap bawaan Tiptap atau browser.
 
+## Impor dan ekspor Microsoft Word (.docx)
+
+Format pertukaran utama adalah **DOCX / Office Open XML**, yaitu format dokumen Word modern. Google Docs memakai format internalnya sendiri dan mendukung DOCX untuk impor/ekspor. Mengganti nama berkas cadangan menjadi `.docx` tidak menghasilkan dokumen Word yang valid.
+
+### Mengimpor dokumen Word
+
+1. Pilih **Impor Word (.docx)** di sidebar.
+2. Pilih berkas `.docx`, maksimal **12 MiB**.
+3. Tunggu konversi dan validasi selesai. Dokumen diimpor sebagai **dokumen baru**; dokumen lama tidak ditimpa.
+4. Periksa isi dan pemberitahuan konversi sebelum menyunting.
+
+Impor menunggu dokumen aktif tersimpan. Jika penyimpanan aktif gagal, amankan isi melalui cadangan atau salinan terlebih dahulu. Berkas yang rusak, terenkripsi, mengandung makro, atau tidak sesuai paket DOCX ditolak. Format `.doc` lama dan `.docm` tidak didukung.
+
+Impor menerima paket DOCX Transitional dengan jalur utama `word/document.xml`, seperti keluaran Word/Google Docs yang umum. Varian Strict OOXML, ZIP64, paket multi-disk, objek OLE/ActiveX, dan berkas dengan struktur arsip ambigu tidak didukung. Batas arsip: 32 MiB setelah ekspansi, 8 MiB per bagian, dan 2.048 entri; batas konten/gambar editor tetap berlaku.
+
+### Mengekspor dokumen Word
+
+Pilih **Unduh Word (.docx)** pada header. Aplikasi menghasilkan paket DOCX asli dengan isi dokumen aktif, termasuk perubahan lokal yang belum tersimpan. Ekspor tidak membutuhkan penulisan IndexedDB yang berhasil, tetapi konversi tetap dapat gagal jika isi atau gambar tidak valid.
+
+Berkas dapat dipakai untuk pertukaran dengan Word atau diimpor ke Google Docs. Konversi tidak menjamin pagination, font, ukuran teks, warna, header/footer, komentar, atau tracked changes identik dengan sumber. Fitur yang tidak tersedia di editor dapat disederhanakan atau hilang; periksa hasilnya. Gunakan cadangan aplikasi untuk pemulihan struktur dan metadata secara lengkap.
+
+Gambar WebP diubah menjadi PNG saat ekspor agar dapat dibaca Word; hasil konversi masih harus memenuhi batas gambar. Animasi GIF dapat tampil sebagai gambar diam pada aplikasi pembaca. Footnote, endnote, dan komentar tidak menjadi fitur editor yang dapat disunting dan dapat dihilangkan saat impor.
+
 ## Cadangan dan impor
 
 ### Menyimpan salinan di luar browser
 
 - **Unduh cadangan** pada header: mengunduh dokumen aktif sebagai `ruang-tulis-dokumen.json`, termasuk snapshot perubahan yang belum tersimpan.
-- **Ekspor semua dokumen** pada sidebar: membaca koleksi tersimpan. Jika dokumen aktif belum tersimpan, ekspor juga menyertakan salinan tambahan berjudul dengan akhiran **(belum tersimpan)**, bukan menimpa versi database.
+- **Cadangkan semua dokumen** pada sidebar: membaca koleksi tersimpan. Jika dokumen aktif belum tersimpan, ekspor juga menyertakan salinan tambahan berjudul dengan akhiran **(belum tersimpan)**, bukan menimpa versi database.
 - Jika koleksi muat dalam satu berkas, hasilnya `ruang-tulis-semua.json`. Jika dibagi, panel **Unduh semua bagian untuk cadangan lengkap.** menyediakan tombol **Bagian 1 · … dokumen**, dan seterusnya. **Klik dan simpan setiap bagian**; satu bagian saja bukan cadangan lengkap. Nama berkasnya `ruang-tulis-bagian-1.json`, dan seterusnya.
 
 Per berkas cadangan dibatasi **12 MiB** dan **100 dokumen**. Berkas cadangan tidak dienkripsi dan dapat memuat data pribadi. Periksa berkas benar-benar tersimpan oleh browser, lalu simpan salinan di tempat aman.
@@ -112,7 +135,7 @@ Per berkas cadangan dibatasi **12 MiB** dan **100 dokumen**. Berkas cadangan tid
 
 Pilih **Impor cadangan**, lalu berkas cadangan Ruang Tulis versi 1. Aplikasi memvalidasi seluruh berkas dan gambar sebelum menambahkan dokumen. Dokumen masuk sebagai **salinan baru** dengan identitas baru; dokumen lama tidak ditimpa. Dokumen pertama hasil impor dibuka. Untuk cadangan terbagi, impor setiap bagian satu per satu. Impor ulang membuat salinan tambahan, bukan pembaruan atau deduplikasi otomatis.
 
-Berkas rusak, versi/format lain, gambar tidak valid, atau berkas terlalu besar dapat ditolak melalui **Operasi gagal.** Detail validasi tertentu masih berbahasa Inggris. Mengganti ekstensi DOCX tidak mengubahnya menjadi berkas cadangan yang valid; konversi itu tidak didukung.
+Berkas rusak, versi/format lain, gambar tidak valid, atau berkas terlalu besar dapat ditolak melalui **Operasi gagal.** Detail validasi tertentu masih berbahasa Inggris. Berkas DOCX harus dibuka melalui **Impor Word (.docx)**, bukan **Impor cadangan**; mengganti ekstensi berkas tidak mengubah formatnya.
 
 ## Gagal menyimpan atau konflik antar-tab
 
@@ -130,4 +153,4 @@ Klik **Cetak / PDF** atau tekan **Ctrl/⌘ P**. Aplikasi memanggil dialog cetak 
 
 Gaya cetak meminta ukuran A4, menyembunyikan toolbar/sidebar, memakai warna terang, dan mengatur margin atas/kiri/kanan 18 mm serta bawah 20 mm. Hasil akhir bergantung pada browser, font yang tersedia, skala, margin, header/footer cetak, dan printer. Tampilan editor bukan pratinjau pagination yang menjamin hasil identik. Periksa pratinjau cetak, khususnya tabel dan gambar panjang. Font Libre Baskerville/DM Sans disebut dalam CSS tetapi tidak diunduh oleh halaman; font pengganti dapat mengubah tata letak.
 
-PDF adalah keluaran cetak, **bukan cadangan yang dapat diimpor kembali untuk menyunting dokumen**. Tidak ada impor/ekspor DOCX, kolaborasi waktu nyata, akun, login, atau sinkronisasi cloud. Membuka dokumen yang sama pada dua tab tidak menjadikannya sesi kolaborasi.
+PDF adalah keluaran cetak, **bukan cadangan yang dapat diimpor kembali untuk menyunting dokumen**. Untuk pertukaran Word gunakan fitur DOCX; untuk pemulihan aplikasi gunakan cadangan. Tidak ada kolaborasi waktu nyata, akun, login, atau sinkronisasi cloud. Membuka dokumen yang sama pada dua tab tidak menjadikannya sesi kolaborasi.

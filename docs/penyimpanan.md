@@ -4,7 +4,7 @@
 
 ## Apa yang disimpan
 
-Ruang Tulis tidak menyimpan dokumen sebagai DOCX, berkas teks di folder proyek, atau record pada backend. Dokumen ditulis ke **IndexedDB browser**:
+Penyimpanan otomatis Ruang Tulis tidak menulis berkas DOCX ke folder proyek atau record pada backend. Dokumen ditulis ke **IndexedDB browser**. DOCX adalah format pertukaran yang tersedia melalui **Impor Word (.docx)** dan **Unduh Word (.docx)**, bukan format penyimpanan otomatis:
 
 | Komponen | Nilai/peran |
 | --- | --- |
@@ -57,7 +57,7 @@ Kedua preferensi ini bukan penyimpanan isi dokumen. Kegagalan mengingat pilihan 
 | Label UI | Hasil |
 | --- | --- |
 | **Unduh cadangan** | Snapshot dokumen aktif, termasuk perubahan yang belum tersimpan; `ruang-tulis-dokumen.json`. |
-| **Ekspor semua dokumen** | Membaca semua record tersimpan; jika sesi aktif masih kotor, menambahkan salinan **(belum tersimpan)**. Hasil satu berkas: `ruang-tulis-semua.json`. |
+| **Cadangkan semua dokumen** | Membaca semua record tersimpan; jika sesi aktif masih kotor, menambahkan salinan **(belum tersimpan)**. Hasil satu berkas: `ruang-tulis-semua.json`. |
 | **Unduh semua bagian untuk cadangan lengkap.** | Bila ekspor dibagi, gunakan setiap tombol **Bagian … · … dokumen** untuk mengunduh seluruh `ruang-tulis-bagian-N.json`. |
 | **Ekspor isi ini** | Snapshot dari panel kegagalan simpan; `ruang-tulis-belum-tersimpan.json`. Tidak memerlukan penulisan IndexedDB yang berhasil. |
 | **Impor cadangan** | Validasi JSON dan gambar, kemudian tambahkan seluruh dokumen dalam satu transaksi sebagai salinan baru. |
@@ -68,9 +68,15 @@ Format cadangan mempunyai penanda `format: 'document-editor'`, `version: 1`, dan
 
 Batas satu berkas adalah **12 MiB** dan **100 dokumen**. Ekspor koleksi dibagi jika diperlukan agar setiap bagian lolos validasi. Jangan hanya menyimpan bagian pertama. Browser juga dapat meminta izin unduh atau memblokir unduhan; periksa lokasi unduhan dan keberadaan berkas.
 
-Impor memberi ID baru, waktu pembuatan/perubahan baru, dan revisi awal 0. Isi/judul dipertahankan, tetapi dokumen lama tidak ditimpa. Seluruh isi cadangan divalidasi dan gambar didekode sebelum transaksi; bila gagal, impor tidak boleh meninggalkan sebagian dokumen. Impor berulang menghasilkan duplikat. Format/versi lain, DOCX, SVG, dan gambar jarak jauh tidak didukung.
+Impor cadangan memberi ID baru, waktu pembuatan/perubahan baru, dan revisi awal 0. Isi/judul dipertahankan, tetapi dokumen lama tidak ditimpa. Seluruh isi cadangan divalidasi dan gambar didekode sebelum transaksi; bila gagal, impor tidak boleh meninggalkan sebagian dokumen. Impor berulang menghasilkan duplikat. Format/versi cadangan lain, SVG, dan gambar jarak jauh tidak didukung. Berkas DOCX memakai jalur **Impor Word (.docx)** yang terpisah.
 
 Cadangan tidak otomatis dibuat di folder proyek, tidak dijadwalkan oleh launcher, dan tidak otomatis diimpor saat aplikasi dimulai. PDF juga bukan cadangan editable yang dapat diimpor kembali.
+
+### Perbedaan DOCX dan cadangan aplikasi
+
+DOCX memuat isi Word yang dikonversi untuk pertukaran, bukan seluruh model internal aplikasi. Impor DOCX menghasilkan dokumen baru dan hanya mempertahankan fitur yang dapat direpresentasikan oleh editor; metadata identitas/revisi aplikasi serta tata letak khusus Word tidak dijamin bertahan. Ekspor DOCX memakai snapshot aktif, termasuk perubahan belum tersimpan, tetapi tetap dapat gagal pada konversi isi/gambar. Berkas DOCX juga tidak dienkripsi oleh aplikasi.
+
+Cadangan aplikasi mempertahankan struktur dan metadata yang divalidasi oleh Ruang Tulis. Gunakan cadangan untuk pemulihan lengkap dan DOCX untuk bertukar dokumen dengan aplikasi lain. Tidak ada konversi hanya dengan mengganti ekstensi.
 
 ## Konflik dan kegagalan penyimpanan
 

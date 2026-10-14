@@ -14,9 +14,12 @@ Ruang Tulis adalah aplikasi klien React dan TypeScript. Tiptap di atas ProseMirr
 | `src/data.ts` | Model dokumen, validasi konten/cadangan, dan penyimpanan IndexedDB. |
 | `src/save-session.ts` | Sesi penyimpanan per identitas dokumen, antrean perubahan, status simpan, dan pemeriksaan revisi. |
 | `src/image-preflight.ts` | Pemeriksaan berkas gambar sebelum penyisipan. |
+| `src/docx.ts` | Konversi DOCX ke skema editor, ekspor Office Open XML, nama berkas, dan pemberitahuan keterbatasan. |
+| `src/docx-archive.ts` | Pemeriksaan ZIP/XML dan relasi paket sebelum konversi berkas Word. |
+| `src/mammoth-browser.d.ts` | Deklarasi tipe untuk entrypoint Mammoth khusus browser. |
 | `src/theme.ts` | Preferensi tema, tema sistem, dan sinkronisasi preferensi antar-tab. |
 | `src/styles.css` | Tata letak, tema, editor, dan gaya cetak. |
-| `src/*.test.ts`, `src/*.test.tsx` | Pengujian editor, data, sesi simpan, gambar, antarmuka, dan tema. |
+| `src/*.test.ts`, `src/*.test.tsx` | Pengujian editor, data, sesi simpan, gambar, antarmuka, tema, dan DOCX. |
 | `src/raster-fixtures.ts`, `src/theme-test-environment.ts` | Fixture gambar dan lingkungan pengujian tema. |
 | `scripts/start-local.mjs` | Launcher lokal: pemeriksaan lingkungan, instalasi dependensi, lock, dan proses Vite. |
 | `scripts/start-local.test.mjs` | Pengujian launcher dengan Node test runner. |
@@ -24,11 +27,15 @@ Ruang Tulis adalah aplikasi klien React dan TypeScript. Tiptap di atas ProseMirr
 | `vite.config.ts`, `tsconfig.json` | Konfigurasi Vite/Vitest dan TypeScript. |
 | `package.json`, `package-lock.json` | Skrip dan versi dependensi yang dikunci. |
 
-Dependensi utama: React 19, Tiptap 3.31.4 beserta StarterKit, Image, Table, dan TextAlign. Peralatan pengembangan: TypeScript 5.8, Vite 6, plugin React, Vitest, jsdom, dan fake-indexeddb. Tidak diperlukan instalasi Vite global atau database server.
+Dependensi utama: React 19, Tiptap 3.31.4 beserta StarterKit, Image, Table, dan TextAlign. Konversi DOCX memakai `docx` untuk menghasilkan Office Open XML, Mammoth untuk impor semantik, dan `fflate` untuk pemeriksaan arsip berbatas. Peralatan pengembangan: TypeScript 5.8, Vite 6, plugin React, Vitest, jsdom, dan fake-indexeddb. Tidak diperlukan instalasi Vite global atau database server.
+
+Mammoth sendiri tidak menyanitasi dokumen. Jalur impor harus memeriksa paket dan batas arsip sebelum konversi, menonaktifkan akses berkas eksternal/style map tertanam, menyaring HTML ke skema editor, serta memvalidasi konten dan mendekode gambar sebelum penyimpanan. Jangan mengganti jalur tersebut dengan pemasangan HTML hasil konversi langsung ke DOM.
+
+Pertahankan pemisahan DOCX dan cadangan aplikasi. Pengujian DOCX harus memeriksa struktur ZIP/XML serta konversi isi sesungguhnya, bukan hanya ekstensi atau mock converter. Konversi semantik tidak menjamin kecocokan seluruh fitur/tata letak Word; perilaku yang belum diuji di aplikasi Office nyata harus disebutkan secara jujur.
 
 ## Lingkungan dan skrip
 
-Gunakan Node.js **22.12.0 atau lebih baru**, npm, dan browser dengan IndexedDB. Jalankan perintah berikut dari akar repositori hasil clone:
+Gunakan Node.js **22.12.0 atau lebih baru**, npm, dan browser modern dengan IndexedDB serta `Promise.withResolvers`. Target keluaran TypeScript tetap ES2022; tipe `ES2024.Promise` tersedia untuk resolver pada jalur konversi berbasis event. Jalankan perintah berikut dari akar repositori hasil clone:
 
 ```sh
 npm start
@@ -104,6 +111,14 @@ Lock merekam kepemilikan proses dan fase peluncuran agar dua launcher tidak mela
 - Runtime Vite/Rollup/esbuild gagal: periksa konfigurasi npm, paket native/opsional, izin berkas, dan hasil instalasi; jangan menandai cache sebagai valid secara manual.
 - `npm ci` selesai tetapi CLI/binary Vite hilang: periksa konfigurasi npm, termasuk `bin-links`.
 - Port terpakai: hentikan aplikasi pemilik port melalui mekanismenya sendiri, lalu coba lagi.
+
+## Status audit dependency DOCX
+
+Saat dukungan DOCX ditambahkan dengan Mammoth 1.13.0, `npm audit` melaporkan **tiga entri moderate** pada rantai `mammoth → argparse → sprintf-js`. Penyebabnya adalah [GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c): format precision yang tidak dibatasi dapat menyebabkan denial of service. Advisory mencakup `sprintf-js <=1.1.3` dan belum mencantumkan versi patch.
+
+`argparse` dipakai oleh CLI `bin/mammoth`; aplikasi ini mengimpor `mammoth/mammoth.browser.js`, bukan CLI tersebut. Bundle browser yang dipakai tidak menyertakan `argparse` atau `sprintf-js`. Ini menjelaskan cakupan temuan, **bukan klaim bahwa audit sudah bersih atau seluruh risiko keamanan telah hilang**. Dependency CLI tetap terpasang melalui paket Mammoth.
+
+Jalankan kembali `npm audit` saat memperbarui dependency dan pantau patch upstream. Jangan memakai `npm audit fix --force`, downgrade besar, atau menonaktifkan audit hanya untuk menghilangkan laporan. Perubahan dependency perlu ditinjau dan diuji ulang.
 
 ## Alur kontribusi yang aman
 

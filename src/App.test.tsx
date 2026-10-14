@@ -8,6 +8,12 @@ import { DocumentStore, type DocumentRecord } from './data';
 import { TINY_PNG } from './raster-fixtures';
 import { installThemeTestEnvironment, type ThemeTestEnvironment } from './theme-test-environment';
 
+const wordCodec = vi.hoisted(() => ({
+  importDocx: vi.fn(),
+  exportDocx: vi.fn(),
+}));
+vi.mock('./docx', () => wordCodec);
+
 const selectionKey = 'ruang-tulis:selected-document';
 let container: HTMLDivElement;
 let root: Root | undefined;
@@ -34,6 +40,8 @@ function installRangeGeometry(): () => void {
 }
 
 beforeEach(() => {
+  wordCodec.importDocx.mockReset();
+  wordCodec.exportDocx.mockReset();
   themeEnvironment = installThemeTestEnvironment();
   vi.stubGlobal('indexedDB', new IDBFactory());
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -127,6 +135,26 @@ async function clickButton(target: HTMLButtonElement): Promise<void> {
   });
 }
 
+async function waitForApp(condition: () => boolean): Promise<void> {
+  const deadline = Date.now() + 3_000;
+  while (!condition() && Date.now() < deadline) {
+    await act(async () => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      window.setTimeout(resolve, 10);
+      await promise;
+    });
+  }
+  expect(condition()).toBe(true);
+}
+
+async function chooseWordFile(file: File): Promise<void> {
+  const input = element<HTMLInputElement>('input[aria-label="Pilih dokumen Word (.docx)"]');
+  await interact(() => {
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
 function expectQueryFocused(input: HTMLInputElement, editor: HTMLElement, originalText: string): void {
   expect(document.activeElement).toBe(input);
   expect(editor.textContent).toBe(originalText);
@@ -142,9 +170,9 @@ describe('App backup copy', () => {
       expect(element(selector).textContent).not.toMatch(/json/i);
     }
 
-    expect(element<HTMLButtonElement>('.header-actions button').textContent).toContain('Unduh cadangan');
-    expect(element<HTMLButtonElement>('.sidebar-backup button:first-child').textContent).toContain('Impor cadangan');
-    expect(element<HTMLButtonElement>('.sidebar-backup button:last-child').textContent).toContain('Ekspor semua dokumen');
+    expect(button('Unduh cadangan').textContent).toContain('Unduh cadangan');
+    expect(button('Impor cadangan').textContent).toContain('Impor cadangan');
+    expect(button('Cadangkan semua dokumen').textContent).toContain('Cadangkan semua dokumen');
     expect(element('.status-bar').textContent).toContain('Penyimpanan lokal');
     expect(element('.local-disclosure').textContent).toContain('Ekspor cadangan untuk melindungi dokumen.');
 
@@ -413,5 +441,135 @@ describe('App image import preflight', () => {
     } finally {
       await store.close();
     }
+  });
+});
+
+describe('App Word document exchange', () => {
+  const wordMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const wordFile = () => new File(['Word fixture'], 'catatan.docx', { type: wordMime });
+
+  it('offers DOCX as the main file exchange while keeping recovery backups separate', async () => {
+    await mountSeededApp();
+    expect(button('Unduh Word (.docx)').disabled).toBe(false);
+    expect(button('Impor Word (.docx)').disabled).toBe(false);
+    const input = element<HTMLInputElement>('input[aria-label="Pilih dokumen Word (.docx)"]');
+    expect(input.accept).toBe(`.docx,${wordMime}`);
+    expect(element<HTMLInputElement>('input[aria-label="Pilih cadangan dokumen"]').accept).toBe('.json,application/json');
+    expect(element('.workspace-header').textContent).not.toMatch(/json/i);
+    expect(element('.sidebar').textContent).not.toMatch(/json/i);
+    const click = vi.spyOn(input, 'click').mockImplementation(() => {});
+    await clickButton(button('Impor Word (.docx)'));
+    expect(click).toHaveBeenCalledOnce();
+  });
+
+  it('downloads the current unsaved snapshot as a DOCX file without requiring a database write', async () => {
+    await mountSeededApp();
+    const result = {
+      blob: new Blob(['DOCX fixture'], { type: wordMime }),
+      filename: 'Catatan.docx',
+      warnings: ['Tata letak kompleks dapat disederhanakan.'],
+    };
+    wordCodec.exportDocx.mockResolvedValue(result);
+    const createObjectURL = vi.fn(() => 'blob:word-download');
+    const revokeObjectURL = vi.fn();
+    const NativeURL = URL;
+    vi.stubGlobal('URL', class extends NativeURL {
+      static createObjectURL = createObjectURL;
+      static revokeObjectURL = revokeObjectURL;
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const save = vi.spyOn(DocumentStore.prototype, 'save');
+    await typeQuery(element<HTMLInputElement>('#document-title'), 'Catatan belum tersimpan');
+    await clickButton(button('Unduh Word (.docx)'));
+    await waitForApp(() => createObjectURL.mock.calls.length === 1);
+    const snapshot = wordCodec.exportDocx.mock.calls[0][0] as DocumentRecord;
+    expect(snapshot.title).toBe('Catatan belum tersimpan');
+    expect(snapshot.content.type).toBe('doc');
+    expect(save).not.toHaveBeenCalled();
+    expect(createObjectURL).toHaveBeenCalledWith(result.blob);
+    const link = click.mock.contexts[0] as HTMLAnchorElement;
+    expect(link.download).toBe('Catatan.docx');
+    expect(link.href).toBe('blob:word-download');
+    expect(element('.notice-message').textContent).toContain('Tata letak kompleks dapat disederhanakan.');
+  });
+
+  it('holds the operation lock during Word conversion and restores editing after an export failure', async () => {
+    const editor = await mountSeededApp();
+    const original = editor.innerHTML;
+    const pending = Promise.withResolvers<{ blob: Blob; filename: string; warnings: string[] }>();
+    wordCodec.exportDocx.mockReturnValue(pending.promise);
+    await clickButton(button('Unduh Word (.docx)'));
+    await waitForApp(() => wordCodec.exportDocx.mock.calls.length === 1);
+    expect(editor.getAttribute('contenteditable')).toBe('false');
+    expect(element<HTMLButtonElement>('.new-document').disabled).toBe(true);
+    expect(button('Impor Word (.docx)').disabled).toBe(true);
+    await act(async () => { pending.reject(new Error('Ekspor Word tidak dapat diselesaikan.')); });
+    await waitForApp(() => editor.getAttribute('contenteditable') === 'true');
+    expect(editor.innerHTML).toBe(original);
+    expect(element('[role="alert"]').textContent).toContain('Ekspor Word tidak dapat diselesaikan.');
+  });
+
+  it('imports a converted DOCX as a new document without replacing an existing record', async () => {
+    await mountSeededApp();
+    const store = new DocumentStore();
+    try {
+      const original = await store.list();
+      const content: DocumentRecord['content'] = {
+        type: 'doc',
+        content: [
+          { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Judul dari Word' }] },
+          { type: 'paragraph', content: [{ type: 'text', text: 'Catatan dari Word', marks: [{ type: 'bold' }] }] },
+        ],
+      };
+      wordCodec.importDocx.mockResolvedValue({
+        title: 'Catatan Word', content, warnings: ['Periksa hasil konversi sebelum melanjutkan.'],
+      });
+      const file = wordFile();
+      await chooseWordFile(file);
+      await waitForApp(() => element<HTMLInputElement>('#document-title').value === 'Catatan Word');
+      expect(wordCodec.importDocx).toHaveBeenCalledWith(file);
+      const records = await store.list();
+      expect(records).toHaveLength(2);
+      expect(records.find(record => record.id === original[0].id)).toEqual(original[0]);
+      expect(records.find(record => record.title === 'Catatan Word')?.content).toEqual(content);
+      expect(element('[aria-label="Isi dokumen"] strong').textContent).toBe('Catatan dari Word');
+      expect(element('.notice-message').textContent).toContain('Dokumen lama tidak ditimpa.');
+      expect(element('.notice-message').textContent).toContain('Periksa hasil konversi sebelum melanjutkan.');
+    } finally {
+      await store.close();
+    }
+  });
+
+  it('keeps the active document and database intact when a Word import is rejected', async () => {
+    const editor = await mountSeededApp();
+    const originalText = editor.innerHTML;
+    const store = new DocumentStore();
+    try {
+      const original = await store.list();
+      const create = vi.spyOn(DocumentStore.prototype, 'create');
+      wordCodec.importDocx.mockRejectedValue(new Error('Paket DOCX tidak valid.'));
+      await chooseWordFile(wordFile());
+      await waitForApp(() => !!container.querySelector('[role="alert"]'));
+      expect(element('[role="alert"]').textContent).toContain('Paket DOCX tidak valid.');
+      expect(create).not.toHaveBeenCalled();
+      expect(await store.list()).toEqual(original);
+      expect(editor.innerHTML).toBe(originalText);
+      expect(editor.getAttribute('contenteditable')).toBe('true');
+      expect(element<HTMLInputElement>('input[aria-label="Pilih dokumen Word (.docx)"]').value).toBe('');
+    } finally {
+      await store.close();
+    }
+  });
+
+  it('cancels Word import before conversion if the active document cannot be flushed', async () => {
+    await mountSeededApp();
+    vi.spyOn(DocumentStore.prototype, 'save').mockRejectedValue(new Error('Kuota penyimpanan habis.'));
+    await typeQuery(element<HTMLInputElement>('#document-title'), 'Perubahan lokal');
+    await chooseWordFile(wordFile());
+    await waitForApp(() => !!container.querySelector('.save-error'));
+    expect(wordCodec.importDocx).not.toHaveBeenCalled();
+    expect(element<HTMLInputElement>('#document-title').value).toBe('Perubahan lokal');
+    expect(element('.save-error').textContent).toContain('Isi belum tersimpan.');
+    expect(button('Unduh Word (.docx)').disabled).toBe(false);
   });
 });

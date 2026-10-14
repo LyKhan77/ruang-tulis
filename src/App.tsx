@@ -7,6 +7,7 @@ import { createExtensions, documentStats, findMatches, headingOutline, replaceAl
 import { SaveSession } from './save-session';
 import { decodeLocalRaster, decodeDocumentImages } from './image-preflight';
 import { useTheme } from './theme';
+import { exportDocx, importDocx } from './docx';
 
 const selectionKey = 'ruang-tulis:selected-document';
 const dateFormat = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -138,6 +139,7 @@ export default function App() {
   const [deleting, setDeleting] = useState<DocumentRecord | null>(null);
   const [backupBatches, setBackupBatches] = useState<DocumentRecord[][]>([]);
   const importInput = useRef<HTMLInputElement>(null);
+  const wordInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const imageSelection = useRef<{ from: number; to: number; id: string } | null>(null);
   const status = sessionRef.current?.status;
@@ -300,6 +302,34 @@ export default function App() {
       setNotice('Cadangan dokumen diunduh. Simpan berkas ini di tempat aman; berkas dapat berisi data pribadi.');
     } catch (failure) { setError(`Ekspor gagal: ${failure instanceof Error ? failure.message : String(failure)}`); }
   }
+
+  function downloadWord() {
+    void action(async () => {
+      const source = sessionRef.current?.snapshot;
+      if (!source) return;
+      const result = await exportDocx(source);
+      const url = URL.createObjectURL(result.blob);
+      try {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = result.filename;
+        link.click();
+      } finally {
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      setNotice(['Dokumen Word (.docx) diunduh. Simpan cadangan aplikasi jika membutuhkan pemulihan lengkap.', ...result.warnings].join(' '));
+    }, false);
+  }
+
+  async function importWord(file: File) {
+    await action(async () => {
+      const result = await importDocx(file);
+      const imported = await store.create(newRecord(result.content, result.title));
+      setRecords(await store.list());
+      bindRecord(imported);
+      setNotice(['Dokumen Word diimpor sebagai dokumen baru. Dokumen lama tidak ditimpa.', ...result.warnings].join(' '));
+    });
+  }
   function exportAll() {
     void action(async () => {
       const latest = await store.list();
@@ -407,7 +437,11 @@ export default function App() {
         {ready && !filtered.length && <p className="empty-list">{records.length ? 'Tidak ada dokumen yang cocok.' : 'Belum ada dokumen. Buat dokumen baru.'}</p>}
         {!ready && <p className="empty-list">{busy ? 'Membuka penyimpanan…' : 'Penyimpanan tidak tersedia.'}</p>}
       </div>
-      <div className="sidebar-backup"><button type="button" disabled={!ready || busy} onClick={() => importInput.current?.click()}><Icon name="upload" size={16} /> Impor cadangan</button><button type="button" disabled={!ready || busy || !records.length} onClick={exportAll}><Icon name="download" size={16} /> Ekspor semua dokumen</button></div>
+      <div className="sidebar-backup">
+        <button type="button" aria-label="Impor Word (.docx)" disabled={!ready || busy} onClick={() => wordInput.current?.click()}><Icon name="file" size={16} /> Impor Word (.docx)</button>
+        <button type="button" aria-label="Impor cadangan" disabled={!ready || busy} onClick={() => importInput.current?.click()}><Icon name="upload" size={16} /> Impor cadangan</button>
+        <button type="button" aria-label="Cadangkan semua dokumen" disabled={!ready || busy || !records.length} onClick={exportAll}><Icon name="download" size={16} /> Cadangkan semua dokumen</button>
+      </div>
       <div className="local-disclosure"><span className="local-dot" /><strong>Lokal, bukan cloud</strong><p>Dokumen hanya di browser ini. Menghapus data browser menghapus dokumen. Ekspor cadangan untuk melindungi dokumen. Tidak ada data yang diunggah.</p></div>
     </aside>
 
@@ -418,6 +452,7 @@ export default function App() {
           <label className="theme-control"><span>Tema</span><select aria-label="Tema tampilan" value={theme.preference} onChange={(event) => theme.setPreference(event.target.value)}>
             <option value="light">Terang</option><option value="dark">Gelap</option><option value="system">Ikuti sistem</option>
           </select></label>
+          <button type="button" aria-label="Unduh Word (.docx)" title="Unduh Word (.docx)" disabled={!current || busy} onClick={downloadWord}><Icon name="file" size={16} /><span>Unduh Word (.docx)</span></button>
           <button type="button" aria-label="Unduh cadangan" disabled={!current || busy} onClick={() => current && download([current], 'ruang-tulis-dokumen.json')}><Icon name="download" size={16} /><span>Unduh cadangan</span></button>
           <button type="button" aria-label="Cetak / PDF" disabled={!current || busy} onClick={() => window.print()}><Icon name="print" size={16} /><span>Cetak / PDF</span></button>
         </div>
@@ -465,6 +500,7 @@ export default function App() {
       </div>
       <footer className="status-bar no-print"><span>{stats.words.toLocaleString('id-ID')} kata <span className="status-separator">·</span> {stats.characters.toLocaleString('id-ID')} karakter</span><span>Bahasa Indonesia <span className="status-separator">·</span> Penyimpanan lokal</span></footer>
     </main>
+    <input className="visually-hidden" ref={wordInput} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-label="Pilih dokumen Word (.docx)" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void importWord(file); }} />
     <input className="visually-hidden" ref={importInput} type="file" accept=".json,application/json" aria-label="Pilih cadangan dokumen" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void importFile(file); }} />
     <input className="visually-hidden" ref={imageInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Pilih gambar lokal" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void insertImage(file); }} />
     {deleting && <div className="modal-backdrop no-print" onKeyDown={(event) => {

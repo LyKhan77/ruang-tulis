@@ -1,6 +1,6 @@
 # Ruang Tulis
 
-Ruang Tulis adalah editor dokumen lokal berbahasa Indonesia, dibangun dengan React, TypeScript, dan Tiptap. Aplikasi menyediakan ruang menulis dengan daftar dokumen, pemformatan, cadangan dokumen, serta tema terang dan gelap. Dokumen disimpan di browser melalui IndexedDB, bukan di cloud atau sebagai berkas DOCX.
+Ruang Tulis adalah editor dokumen lokal berbahasa Indonesia, dibangun dengan React, TypeScript, dan Tiptap. Aplikasi menyediakan ruang menulis dengan daftar dokumen, pemformatan, impor/ekspor Microsoft Word (.docx), cadangan dokumen, serta tema terang dan gelap. Penyimpanan otomatis memakai IndexedDB browser, bukan cloud; berkas DOCX digunakan untuk pertukaran dengan Microsoft Word atau Google Docs.
 
 ## Fitur yang tersedia
 
@@ -9,17 +9,20 @@ Ruang Tulis adalah editor dokumen lokal berbahasa Indonesia, dibangun dengan Rea
 - Teks normal dan Judul 1–3, tebal, miring, garis bawah, coret, daftar poin/bernomor, inden, perataan kiri/tengah/kanan, tautan, dan hapus format.
 - Gambar lokal PNG, JPEG, GIF, dan WebP; tabel 3 × 3 dengan operasi baris/kolom; kerangka judul dan hitungan kata/karakter.
 - Cari dan ganti teks literal pada dokumen aktif, tanpa membedakan huruf besar/kecil.
-- Unduh cadangan dokumen aktif, ekspor semua dokumen, serta impor cadangan sebagai salinan baru.
+- Impor **Word (.docx)** sebagai dokumen baru dan unduh dokumen aktif sebagai paket **Office Open XML** asli, bukan cadangan dengan ekstensi yang diganti.
+- Unduh cadangan dokumen aktif, cadangkan semua dokumen, serta impor cadangan sebagai salinan baru untuk pemulihan lengkap aplikasi.
 - Tema **Terang**, **Gelap**, dan **Ikuti sistem**.
 - **Cetak / PDF** melalui dialog cetak browser, bukan generator PDF khusus.
 
-Belum tersedia: impor/ekspor **DOCX**, kolaborasi waktu nyata, akun, autentikasi, atau sinkronisasi cloud. Beberapa kesalahan validasi/penyimpanan masih ditampilkan dalam bahasa Inggris.
+Konversi DOCX mendukung isi dan format semantik yang tersedia di editor, tetapi tidak menjamin tata letak identik dengan Word. Format `.doc` lama dan `.docm`, kolaborasi waktu nyata, akun, autentikasi, serta sinkronisasi cloud tidak didukung. Beberapa kesalahan validasi/penyimpanan masih ditampilkan dalam bahasa Inggris.
+
+**Catatan keamanan:** audit dependency mencatat tiga entri moderate pada rantai CLI Mammoth yang tidak dipakai jalur browser aplikasi. Versi patch upstream belum tersedia saat fitur ini ditambahkan. Lihat [status audit DOCX](docs/pengembangan.md#status-audit-dependency-docx) untuk cakupan dan tindak lanjutnya.
 
 ## Persyaratan
 
 - Node.js **22.12.0 atau lebih baru** dan npm; gunakan Node LTS yang memenuhi minimum tersebut.
 - Git untuk clone repositori.
-- Browser modern dengan IndexedDB. `localStorage` digunakan terpisah untuk preferensi tema dan pilihan dokumen.
+- Browser modern dengan IndexedDB dan `Promise.withResolvers`. `localStorage` digunakan terpisah untuk preferensi tema dan pilihan dokumen.
 - Port `127.0.0.1:5173` yang tidak sedang digunakan.
 - Akses ke registry npm atau cache npm yang memadai saat dependensi perlu dipasang. Tidak diperlukan Vite global atau backend/database server.
 
@@ -65,7 +68,7 @@ node scripts/start-local.mjs --help
 
 **Menghapus data situs/browser dapat menghapus seluruh dokumen.** Dokumen terikat ke origin dan profil browser: `127.0.0.1` berbeda dari `localhost`, dan port berbeda memakai penyimpanan berbeda. Aplikasi tidak menyinkronkan dokumen ke browser, profil, atau perangkat lain.
 
-Tunggu **Tersimpan di browser** sebelum menutup tab. Perubahan yang belum berhasil disimpan tidak dijamin pulih setelah reload atau browser ditutup. Gunakan **Unduh cadangan** atau **Ekspor semua dokumen** secara berkala dan simpan berkas di tempat aman. Berkas cadangan tidak dienkripsi oleh aplikasi dan dapat memuat data pribadi serta gambar.
+Tunggu **Tersimpan di browser** sebelum menutup tab. Perubahan yang belum berhasil disimpan tidak dijamin pulih setelah reload atau browser ditutup. Gunakan **Unduh cadangan** atau **Cadangkan semua dokumen** secara berkala dan simpan berkas di tempat aman. Berkas cadangan tidak dienkripsi oleh aplikasi dan dapat memuat data pribadi serta gambar. DOCX digunakan untuk pertukaran dokumen, bukan sebagai pengganti cadangan lengkap aplikasi.
 
 Binding server ke loopback bukan jaminan enkripsi, autentikasi, atau isolasi jaringan. Lihat panduan penyimpanan untuk konflik, kegagalan IndexedDB, dan pemulihan.
 
